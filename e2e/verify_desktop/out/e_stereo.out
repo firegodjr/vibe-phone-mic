@@ -1,0 +1,5 @@
+CONNECTED 127.0.0.1:48793
+HELLO {"name":"Verifier Sim","sampleRate":48000,"channels":2,"format":"s16le","frameMs":10,"version":1}
+STATUS {"muted":false,"volume":100,"input":"Sim microphone"}
+DISCONNECTED disconnected
+SUMMARY frames=201 samples=192960 rms=0.35353 dominant_hz=600.0 lost_frames=0 muted=false

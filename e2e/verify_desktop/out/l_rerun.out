@@ -1,0 +1,8 @@
+removed 2 stale virtual-mic module(s) from a previous run
+VIRTUAL_MIC ready source=vibe_phone_mic
+connecting to 127.0.0.1:48794 ...
+CONNECTED 127.0.0.1:48794
+HELLO {"name":"Verifier Sim","sampleRate":48000,"channels":1,"format":"s16le","frameMs":10,"version":1}
+STATUS {"muted":false,"volume":100,"input":"Sim microphone"}
+DISCONNECTED disconnected
+SUMMARY frames=201 samples=96480 rms=0.35352 dominant_hz=523.0 lost_frames=0 muted=false

@@ -1,0 +1,4 @@
+[phone_sim] tcp listening on ('127.0.0.1', 48793) behavior close:150
+[phone_sim] handshake from ('127.0.0.1', 60188) 56504d4301000000
+[phone_sim] closing after 150 frames
+[phone_sim] stats {"probes": 0, "streams": 1, "bad_handshakes": 0, "frames_sent": 150}

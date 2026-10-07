@@ -1,0 +1,4 @@
+[phone_sim] tcp listening on ('127.0.0.1', 48786) behavior normal
+[phone_sim] handshake from ('127.0.0.1', 54336) 56504d4301000000
+[phone_sim] stream ended: [Errno 32] Broken pipe
+[phone_sim] stats {"probes": 0, "streams": 1, "bad_handshakes": 0, "frames_sent": 313}

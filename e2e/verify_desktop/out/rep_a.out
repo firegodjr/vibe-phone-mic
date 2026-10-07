@@ -1,0 +1,8 @@
+connecting to 127.0.0.1:48795 ...
+CONNECTED 127.0.0.1:48795
+HELLO {"name":"Verifier Sim","sampleRate":48000,"channels":1,"format":"s16le","frameMs":10,"version":1}
+STATUS {"muted":false,"volume":100,"input":"Sim microphone"}
+BYE {"reason":"replaced"}
+DISCONNECTED replaced
+SUMMARY frames=150 samples=72000 rms=0.35353 dominant_hz=523.0 lost_frames=0 muted=false
+connection ended: replaced

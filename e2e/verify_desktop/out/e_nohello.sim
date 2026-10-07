@@ -1,0 +1,2 @@
+[phone_sim] tcp listening on ('127.0.0.1', 48793) behavior nohello
+[phone_sim] handshake from ('127.0.0.1', 49256) 56504d4301000000

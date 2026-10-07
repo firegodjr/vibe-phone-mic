@@ -1,0 +1,3 @@
+[phone_sim] tcp listening on ('127.0.0.1', 48774) behavior garbage
+[phone_sim] handshake from ('127.0.0.1', 34462) 56504d4301000000
+[phone_sim] stats {"probes": 0, "streams": 1, "bad_handshakes": 0, "frames_sent": 0}

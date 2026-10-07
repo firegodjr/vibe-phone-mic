@@ -1,0 +1,6 @@
+VIRTUAL_MIC error in-use: the Vibe Phone Mic virtual microphone is owned by another running instance (pid 174961)
+CONNECTED 127.0.0.1:48796
+HELLO {"name":"Verifier Sim","sampleRate":48000,"channels":1,"format":"s16le","frameMs":10,"version":1}
+STATUS {"muted":false,"volume":100,"input":"Sim microphone"}
+DISCONNECTED disconnected
+SUMMARY frames=302 samples=144960 rms=0.35352 dominant_hz=880.0 lost_frames=0 muted=false

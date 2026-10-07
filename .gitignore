@@ -1,0 +1,11 @@
+target/
+/dist/
+/tools/
+/e2e/out/
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+*.AppImage
+/.cache/

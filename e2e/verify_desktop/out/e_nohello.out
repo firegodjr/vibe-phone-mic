@@ -1,0 +1,3 @@
+CONNECTED 127.0.0.1:48793
+DISCONNECTED Not a Vibe Phone Mic server (expected HELLO, got frame type 0x03)
+SUMMARY frames=0 samples=0 rms=0.00000 dominant_hz=none lost_frames=0 muted=false

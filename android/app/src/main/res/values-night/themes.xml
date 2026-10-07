@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.VibePhoneMic" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/surface_dark</item>
+        <item name="android:colorPrimary">@color/neutral_light</item>
+        <item name="android:colorAccent">@color/neutral_light</item>
+        <item name="android:colorControlActivated">@color/neutral_light</item>
+    </style>
+</resources>

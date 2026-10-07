@@ -1,0 +1,10 @@
+[phone_sim] udp discovery on ('0.0.0.0', 48777)
+[phone_sim] tcp listening on ('192.168.0.139', 48790) behavior normal
+[phone_sim] udp from ('192.168.0.139', 42616) b'VPMIC_DISCOVER_V1'
+[phone_sim] udp from ('192.168.0.139', 42616) b'VPMIC_DISCOVER_V1'
+[phone_sim] udp from ('192.168.0.139', 42616) b'VPMIC_DISCOVER_V1'
+[phone_sim] udp from ('192.168.0.139', 42616) b'VPMIC_DISCOVER_V1'
+[phone_sim] udp from ('192.168.0.139', 43316) b'VPMIC_DISCOVER_V1'
+[phone_sim] udp from ('192.168.0.139', 43316) b'VPMIC_DISCOVER_V1'
+[phone_sim] udp from ('192.168.0.139', 43316) b'VPMIC_DISCOVER_V1'
+[phone_sim] udp from ('192.168.0.139', 43316) b'VPMIC_DISCOVER_V1'
