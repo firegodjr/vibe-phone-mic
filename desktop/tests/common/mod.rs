@@ -1,6 +1,8 @@
 //! In-process fake phone server for integration tests (protocol v1).
 #![allow(dead_code)]
 
+pub mod pw;
+
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream, UdpSocket};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};

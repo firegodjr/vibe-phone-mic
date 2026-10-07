@@ -18,6 +18,7 @@ APK="$REPO/android/app/build/outputs/apk/debug/app-debug.apk"
 PKG=com.vibephonemic
 PORT=48777
 TONE=440
+DISTRACT=1000
 BUILD=1; KEEP=0
 for a in "$@"; do case "$a" in --no-build) BUILD=0;; --keep-emulator) KEEP=1;; *) echo "unknown arg $a"; exit 2;; esac; done
 
@@ -29,6 +30,15 @@ export ANDROID_USER_HOME="$REPO/.cache/android-prefs/.android"
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk}"
 export ANDROID_HOME="$SDK"
 unset DISPLAY WAYLAND_DISPLAY   # everything headless; the screen may be off
+
+# Run the AppImage the way a user would: on the host. Inside a toolbox/distrobox container,
+# hop out with flatpak-spawn so it uses the host's libpipewire/SPA plugins and FUSE.
+if [ -f /run/.containerenv ] && command -v flatpak-spawn >/dev/null; then
+  app() { flatpak-spawn --host "$APPIMAGE" "$@"; }
+  echo "[e2e] running the AppImage on the host via flatpak-spawn"
+else
+  app() { "$APPIMAGE" "$@"; }
+fi
 
 RESULTS=()
 pass() { RESULTS+=("PASS  $1"); echo "[e2e] PASS  $1"; }
@@ -70,7 +80,7 @@ with_app() {
 # headless_run NAME SECS [extra args] -> runs the AppImage, leaves $OUT/e2e-NAME.{wav,log}
 headless_run() {
   local name="$1" secs="$2"; shift 2
-  "$APPIMAGE" --headless --connect "127.0.0.1:$PORT" --wav "$OUT/e2e-$name.wav" --duration "$secs" "$@" \
+  app --headless --connect "127.0.0.1:$PORT" --wav "$OUT/e2e-$name.wav" --duration "$secs" "$@" \
     >"$OUT/e2e-$name.log" 2>&1
   echo $? >"$OUT/e2e-$name.exit"
 }
@@ -113,7 +123,7 @@ if [ "$BUILD" = 1 ]; then
 fi
 
 # ---------------------------------------------------------------- 2. emulator + app
-SERIAL=$("$REPO/e2e/start_emulator.sh" | tail -1)
+SERIAL=$(env -u ANDROID_PREFS_ROOT -u ANDROID_USER_HOME "$REPO/e2e/start_emulator.sh" | tail -1)
 check "emulator booted ($SERIAL)" [ -n "$SERIAL" ]
 [ -n "$SERIAL" ] || { printf '%s\n' "${RESULTS[@]}"; exit 1; }
 A root >/dev/null 2>&1; sleep 2
@@ -138,7 +148,7 @@ A shell input keyevent KEYCODE_HOME; sleep 1
 restart_service
 
 # ---------------------------------------------------------------- 3. discovery
-"$APPIMAGE" --scan --timeout-ms 2500 >"$OUT/e2e-scan.json" 2>"$OUT/e2e-scan.log"
+app --scan --timeout-ms 2500 >"$OUT/e2e-scan.json" 2>"$OUT/e2e-scan.log"
 check "AppImage --scan finds the phone (USB/localhost)" \
   python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if any(x["host"]=="127.0.0.1" and x["port"]==48777 for x in d) else 1)' "$OUT/e2e-scan.json"
 # UDP responder in the guest, reached through an emulator UDP redirect.
@@ -147,12 +157,26 @@ python3 "$REPO/e2e/verify_android_client.py" discover --target 127.0.0.1 --port 
 check "phone answers UDP discovery" grep -q '"vibe-phone-mic"' "$OUT/e2e-udp.log"
 emu redir del "udp:$PORT" >/dev/null 2>&1
 
+rm -f "$OUT/e2e-virtualmic.present"
 # ---------------------------------------------------------------- 4. real audio, end to end
-log "streaming real mic audio (6 s) while recording the Vibe Phone Mic source"
-( sleep 2.5; timeout 3 parecord -d vibe_phone_mic --raw --format=s16le --rate=48000 --channels=1 "$OUT/e2e-virtualmic.raw" ) &
+log "streaming real mic audio (6 s) while recording the Vibe Phone Mic source, with system audio playing"
+DEF_SINK=$(pactl get-default-sink)
+# Distractor: a quiet ${DISTRACT} Hz tone on the user's default output. It must NOT appear in the virtual mic
+# (regression for the remap-source fallback that leaked system audio into the mic).
+ffmpeg -hide_banner -loglevel error -nostdin -re -f lavfi -i "sine=frequency=${DISTRACT}:sample_rate=48000:duration=7" \
+  -af volume=0.05 -f pulse vpm_e2e_distractor >/dev/null 2>&1 &
+DIST=$!
+(
+  sleep 2.5
+  pactl list short sources | awk '{print $2}' | grep -qx vibe_phone_mic && echo yes >"$OUT/e2e-virtualmic.present"
+  # parec silently falls back to the default mic if the source is missing, hence the presence check above.
+  timeout 4 parec -d vibe_phone_mic --raw --format=s16le --rate=48000 --channels=1 | head -c 192000 >"$OUT/e2e-virtualmic.raw" &
+  timeout 4 parec -d "$DEF_SINK.monitor" --raw --format=s16le --rate=48000 --channels=1 | head -c 192000 >"$OUT/e2e-speakers.raw"
+  wait
+) &
 PAREC=$!
 real_tone_run real 6
-wait $PAREC
+wait $PAREC; wait $DIST 2>/dev/null
 check "headless stream exit 0" [ "$(cat "$OUT/e2e-real.exit")" = 0 ]
 check "HELLO received" grep -q '^HELLO {' "$OUT/e2e-real.log"
 check "STATUS received (unmuted, vol 100)" grep -qE '^STATUS .*"muted": ?false.*' "$OUT/e2e-real.log"
@@ -161,6 +185,9 @@ read -r Z N < <(zero_blocks "$OUT/e2e-real.wav")
 log "real stream: $Z of $N 10ms blocks are all-zero"
 check "no empty (all-zero) frames once streaming (${Z}/${N})" [ "$Z" -le 10 -a "$N" -ge 500 ]
 check "Vibe Phone Mic pulse source carries the tone" analyze "$OUT/e2e-virtualmic.raw" --expect $TONE --tol 5 --min-dbfs -40
+check "virtual mic source existed during recording" [ -f "$OUT/e2e-virtualmic.present" ]
+check "system audio was really playing (speaker monitor has ${DISTRACT} Hz)" python3 "$REPO/e2e/leak_check.py" played "$OUT/e2e-speakers.raw" $DISTRACT
+check "no system audio leaks into the virtual mic" python3 "$REPO/e2e/leak_check.py" clean "$OUT/e2e-virtualmic.raw" $DISTRACT $TONE
 check "virtual mic removed after exit" bash -c '! pactl list short modules | grep -q vibe_phone_mic'
 BASE_RMS=$(rms_of "$OUT/e2e-real.wav")
 
@@ -184,7 +211,7 @@ check "volume 50% halves the level (base=$BASE_RMS half=$HALF_RMS)" \
 with_app bash -c 'for i in 1 2 3 4 5; do "$0" tap volume_up; sleep 0.3; done' "$REPO/e2e/ui.sh"
 
 # ---------------------------------------------------------------- 7. client replacement (BYE)
-"$APPIMAGE" --headless --connect "127.0.0.1:$PORT" --duration 12 --no-virtual-mic >"$OUT/e2e-replaced-a.log" 2>&1 &
+app --headless --connect "127.0.0.1:$PORT" --duration 12 --no-virtual-mic >"$OUT/e2e-replaced-a.log" 2>&1 &
 APID=$!; sleep 3
 headless_run replaced-b 3 --no-virtual-mic
 T0=$(date +%s); wait $APID; T1=$(date +%s)
@@ -212,7 +239,7 @@ A shell input keyevent KEYCODE_HOME; sleep 1
 
 # ---------------------------------------------------------------- 9. screenshots of both apps, connected to each other
 log "screenshots"
-"$APPIMAGE" --headless --connect "127.0.0.1:$PORT" --duration 14 --no-virtual-mic >"$OUT/e2e-shot-stream.log" 2>&1 &
+app --headless --connect "127.0.0.1:$PORT" --duration 14 --no-virtual-mic >"$OUT/e2e-shot-stream.log" 2>&1 &
 SPID=$!; sleep 2
 # Test-tone hook keeps the phone meter moving while the activity is in front (mic HAL limitation).
 A shell am start -n "$PKG/.MainActivity" --ez test_tone true --ei test_tone_hz $TONE >/dev/null; sleep 3
@@ -222,7 +249,7 @@ A exec-out screencap -p >"$OUT/e2e-android-dark-connected.png"
 A shell cmd uimode night no >/dev/null
 wait $SPID
 for theme in light dark; do
-  "$APPIMAGE" --screenshot "$OUT/e2e-desktop-$theme-connected.png" --theme $theme --connect "127.0.0.1:$PORT" --no-virtual-mic \
+  app --screenshot "$OUT/e2e-desktop-$theme-connected.png" --theme $theme --connect "127.0.0.1:$PORT" --no-virtual-mic \
     >>"$OUT/e2e-shot-desktop.log" 2>&1
 done
 A shell am start -n "$PKG/.MainActivity" --ez test_tone false >/dev/null; sleep 1

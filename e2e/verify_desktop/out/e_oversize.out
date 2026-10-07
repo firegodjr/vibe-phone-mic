@@ -1,5 +1,0 @@
-CONNECTED 127.0.0.1:48793
-HELLO {"name":"Verifier Sim","sampleRate":48000,"channels":1,"format":"s16le","frameMs":10,"version":1}
-STATUS {"muted":false,"volume":100,"input":"Sim microphone"}
-DISCONNECTED payload too large: 1048577 bytes
-SUMMARY frames=0 samples=0 rms=0.00000 dominant_hz=none lost_frames=0 muted=false

@@ -1,5 +1,0 @@
-VIRTUAL_MIC ready source=vibe_phone_mic
-connecting to 127.0.0.1:48794 ...
-CONNECTED 127.0.0.1:48794
-HELLO {"name":"Verifier Sim","sampleRate":48000,"channels":1,"format":"s16le","frameMs":10,"version":1}
-STATUS {"muted":false,"volume":100,"input":"Sim microphone"}

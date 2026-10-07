@@ -84,7 +84,9 @@ while [ $SECONDS -lt $deadline ]; do
   if [ -n "$SERIAL" ] && [ "$("$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; then
     break
   fi
-  if ! pgrep -f "^[^ ]*qemu-system-x86_64 .*-avd $AVD" >/dev/null; then
+  # The `emulator` wrapper execs qemu after a moment; only declare death after a grace period.
+  if [ $SECONDS -gt $((deadline - BOOT_TIMEOUT + 30)) ] \
+     && ! pgrep -f "^[^ ]*(qemu-system-x86_64|emulator/emulator) .*-avd $AVD" >/dev/null; then
     log "ERROR: emulator died; see e2e/out/emulator.log"; exit 1
   fi
   SERIAL=""; sleep 3

@@ -17,7 +17,7 @@ Mute, volume (0–200 %) and the microphone input (Settings) are controlled on t
 
 **USB / direct:** `adb forward tcp:48777 tcp:48777`, then connect to `127.0.0.1` (the desktop scan finds it automatically).
 
-Requirements on Linux: PulseAudio or PipeWire with pipewire-pulse (libpulse), x86_64. Phone: Android 8.0+.
+Requirements on Linux: PipeWire (libpipewire-0.3 ≥ 0.3.49; the mic is a native PipeWire source), x86_64. Plain PulseAudio falls back to a pipe source (untested). Phone: Android 8.0+.
 
 ## Layout
 
@@ -29,9 +29,9 @@ Requirements on Linux: PulseAudio or PipeWire with pipewire-pulse (libpulse), x8
 ## Tests
 
 ```sh
-cd desktop && CARGO_HOME=../.cache/cargo cargo test          # 84 tests, no display needed
+cd desktop && CARGO_HOME=../.cache/cargo cargo test          # 103 tests; audio tests use a private PipeWire instance
 cd android && ./gradlew testDebugUnitTest                    # 110 tests (see android/README.md for env vars)
-e2e/run_e2e.sh [--no-build] [--keep-emulator]                # full end-to-end, 27 checks
+e2e/run_e2e.sh [--no-build] [--keep-emulator]                # full end-to-end, 30 checks
 ```
 
 The e2e harness checks discovery (scan + UDP), real mic audio (440 Hz, no empty frames) in both the received WAV

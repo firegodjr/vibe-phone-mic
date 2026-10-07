@@ -797,6 +797,14 @@ impl VpmApp {
     /// Virtual-mic hint / status line (shown in every state).
     fn mic_hint(&self, ui: &mut egui::Ui, p: &Palette) {
         ui.add_space(4.0);
+        if let Some(h) = self.mic.as_ref().and_then(|m| m.legacy_hint()) {
+            ui.label(RichText::new(h).color(p.text));
+        }
+        if self.mic.as_ref().is_some_and(|m| !m.is_active() && !m.is_shut_down()) {
+            ui.label(RichText::new("Virtual microphone unavailable — reconnecting to PipeWire…").strong().color(p.text));
+            ui.ctx().request_repaint_after(Duration::from_millis(250));
+            return;
+        }
         if self.mic_active() {
             egui::Frame::new()
                 .fill(p.bg)

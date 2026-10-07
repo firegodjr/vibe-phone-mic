@@ -118,8 +118,16 @@ fn headless(cli: &Cli) -> i32 {
         let _ = ctrlc::set_handler(move || stop.store(true, Ordering::SeqCst));
     }
     let mic = if cli.no_virtual_mic { None } else { create_mic() };
-    if mic.is_some() {
-        println!("VIRTUAL_MIC ready source={}", audio::SOURCE_NAME);
+    let mut mic_up = mic.as_ref().is_some_and(|m| m.is_active());
+    if let Some(m) = &mic {
+        if mic_up {
+            println!("VIRTUAL_MIC ready source={}", audio::SOURCE_NAME);
+        } else {
+            println!("VIRTUAL_MIC unavailable {} (retrying)", m.last_error());
+        }
+        if let Some(h) = m.legacy_hint() {
+            println!("VIRTUAL_MIC legacy {h}");
+        }
     }
     let opts = SessionOptions { mic: mic.clone(), wav: cli.wav.clone(), log: true, read_timeout: None };
     eprintln!("connecting to {addr} ...");
@@ -135,6 +143,17 @@ fn headless(cli: &Cli) -> i32 {
         }
         if session.snapshot().phase == Phase::Disconnected {
             break;
+        }
+        if let Some(m) = &mic {
+            let up = m.is_active();
+            if up != mic_up {
+                mic_up = up;
+                if up {
+                    println!("VIRTUAL_MIC ready source={}", audio::SOURCE_NAME);
+                } else {
+                    println!("VIRTUAL_MIC unavailable {} (retrying)", m.last_error());
+                }
+            }
         }
     }
     session.stop();

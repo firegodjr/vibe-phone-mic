@@ -1,8 +1,0 @@
-[phone_sim] tcp listening on ('127.0.0.1', 48772) behavior bye-stopped:400
-[phone_sim] handshake from ('127.0.0.1', 33894) 56504d4301000000
-[phone_sim] sent BYE stopped after 400 frames
-[phone_sim] stats {"probes": 0, "streams": 1, "bad_handshakes": 0, "frames_sent": 400}
-[phone_sim] handshake from ('127.0.0.1', 48892) 56504d4301000000
-[phone_sim] sent BYE stopped after 400 frames
-[phone_sim] stats {"probes": 0, "streams": 2, "bad_handshakes": 0, "frames_sent": 400}
-[phone_sim] handshake from ('127.0.0.1', 44212) 56504d4301000000

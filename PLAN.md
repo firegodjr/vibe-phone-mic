@@ -39,7 +39,7 @@ Port: **48777** for both TCP (stream) and UDP (discovery). All integers **big-en
 
 ## Desktop app (`desktop/`, Rust)
 - Crate `vibe-phone-mic`: `lib` (protocol codec, discovery, client/receiver thread, audio output trait + PulseAudio impl, WAV writer) and `bin` (eframe/egui GUI + headless CLI).
-- Virtual mic via libpulse: load `module-null-sink sink_name=vibe_phone_mic_sink` + `module-remap-source master=vibe_phone_mic_sink.monitor source_name=vibe_phone_mic` (description "Vibe Phone Mic"); play received PCM into the sink with a small jitter buffer (~60 ms); unload modules on disconnect/exit.
+- Virtual mic: a native PipeWire stream that IS an `Audio/Source` node (`node.name=vibe_phone_mic`, description "Vibe Phone Mic", `node.virtual=true`, `priority.session=1`, 48 kHz mono S16) created with libpipewire (C shim over `pw_stream`). NO PulseAudio modules on PipeWire: a remap-source can fall back to the default sink monitor (system audio leaked into the mic), and unloading `module-pipe-source` crashes PipeWire 1.6.8 (pipe-tunnel use-after-free). Desktop downmixes/resamples to 48 kHz mono; RT callback pulls from a 40 ms jitter buffer (silence on underrun). Created at app start, kept across disconnects, removed on exit; vanishes automatically if the app dies; re-created when PipeWire restarts. Single owner via lock file. Legacy null-sink/remap modules are unloaded at startup; legacy pipe-sources are left alone with a "restart PipeWire" hint. Real PulseAudio (no PipeWire) falls back to module-pipe-source. All audio tests run against a private PipeWire instance (desktop/tools/pw-private.sh), never the user's daemon.
 - CLI (used by tests/e2e):
   - `--scan [--timeout-ms N]` → prints JSON array of found servers.
   - `--headless --connect HOST[:PORT] [--wav out.wav] [--duration SECS] [--no-virtual-mic]` → streams; logs HELLO/STATUS; writes received PCM to WAV.
@@ -78,6 +78,20 @@ Clean and readable. White / dark-gray surfaces and text. **Orange→red gradient
 ## Test coverage rule (from user)
 Each app must have tests for all reasonable states, including settings, and those suites must be run against the real implementation before a feature is accepted. Android: server states, mute/volume extremes, permission states, every settings state (default/specific/vanished device/persistence), main-screen UI states, debug tone hook. Desktop: all client/connection states incl. errors, sample rates, scan result kinds, manual-entry validation, virtual-mic lifecycle, GUI view per state.
 
+## Virtual mic history (important)
+1. null-sink + remap-source: LEAKED SYSTEM AUDIO. pipewire-pulse remap's capture stream falls back to the default sink monitor when its master isn't resolvable at link time.
+2. module-pipe-source: no leak, but PipeWire 1.6.8 SEGFAULTS on unload (pipe-tunnel on_timeout vs impl_destroy race) -> crashes the user's audio server. Do not ship.
+3. Native PipeWire stream with media.class=Audio/Source (SHIPPED): no modules, no fallback, auto-cleanup on crash; lock-free SPSC ring jitter buffer (~40 ms), node.latency=1024/48000, fades on trims/underruns, no late-attach click. pipe-source only as a fallback for real PulseAudio.
+Rule: crash-prone audio experiments and module-loading tests run against a PRIVATE PipeWire instance, never the user's live session. e2e must play a distractor to the default sink and assert it doesn't leak into the mic.
+
+## Deferred / known gaps
+- Flatpak Discord re-test of the native source by the user (host checks pass: no leak, no clicks, cleanup OK).
+- Pure-PulseAudio fallback (pipe-source) untested (no PulseAudio server available).
+- WirePlumber may make "Vibe Phone Mic" the default input if it is the only source (priority.session=1 otherwise).
+- 2-minute drift test tolerates a click only when PipeWire reports a simultaneous xrun (no RT scheduling in the toolbox).
+- desktop/README.md jitter-buffer details may lag the lock-free ring implementation.
+- AppImage built against Arch/Fedora-new glibc; older distros untested.
+
 ## Process
 - Implementation agents per app; independent verifier agent re-tests each feature before it's accepted.
 - Status log below is updated as work completes.
@@ -88,5 +102,5 @@ Each app must have tests for all reasonable states, including settings, and thos
 - [x] Desktop verified by second agent; round-2 fixes re-verified PASS (84 tests)
 - [x] Android app implemented (79 tests)
 - [x] Android verified by second agent (all functional PASS on emulator → fix round 2: BYE, STOP crash, layout, AudioRecord watchdog, MicService tests)
-- [x] E2E harness green in emulator (27/27 with build, 24/24 rerun --no-build, 2026-10-06)
+- [x] E2E harness green in emulator (27/27 2026-10-06; 30/30 2026-10-07 with native PipeWire mic, AppImage run on host, system-audio leak check)
 - [x] Final deliverables in `dist/` (VibePhoneMic.apk, VibePhoneMic-x86_64.AppImage)

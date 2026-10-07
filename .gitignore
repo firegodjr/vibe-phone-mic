@@ -9,3 +9,7 @@ local.properties
 .idea/
 *.AppImage
 /.cache/
+/e2e/verify_desktop/out/
+__pycache__/
+/e2e/verify_desktop/*.log
+/e2e/verify_desktop/*.txt

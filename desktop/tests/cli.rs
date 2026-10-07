@@ -2,6 +2,7 @@
 
 mod common;
 
+use common::pw::{private_pw, PrivatePw};
 use common::{Behavior, FakeConfig, FakePhone};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
@@ -120,25 +121,32 @@ fn scan_prints_json_array_within_budget() {
     }
 }
 
-fn modules_loaded() -> bool {
-    let o = Command::new("pactl").args(["list", "short", "modules"]).output().unwrap();
-    String::from_utf8_lossy(&o.stdout).contains("source_name=vibe_phone_mic ")
+fn mic_present(pw: &PrivatePw) -> bool {
+    !pw.sources_matching("vibe_phone_mic").is_empty()
+}
+
+fn wait_mic(pw: &PrivatePw, present: bool, what: &str) {
+    pw.wait_for(what, Duration::from_secs(5), || mic_present(pw) == present);
+}
+
+fn run_pw(pw: &PrivatePw, args: &[&str]) -> (Output, String, String) {
+    let out = pw.cmd(BIN).args(args).output().unwrap();
+    let so = String::from_utf8_lossy(&out.stdout).to_string();
+    let se = String::from_utf8_lossy(&out.stderr).to_string();
+    (out, so, se)
 }
 
 /// Start headless with the virtual mic, wait for audio, send `signal`, check cleanup.
-fn signal_cleanup(signal: &str) {
+fn signal_cleanup(pw: &PrivatePw, signal: &str) {
     let phone = FakePhone::start(FakeConfig::default());
-    let child = Command::new(BIN)
+    let child = pw
+        .cmd(BIN)
         .args(["--headless", "--connect", &phone.addr()])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    let t = Instant::now();
-    while !modules_loaded() {
-        assert!(t.elapsed() < Duration::from_secs(5), "virtual mic not created");
-        std::thread::sleep(Duration::from_millis(50));
-    }
+    wait_mic(pw, true, "virtual mic created");
     std::thread::sleep(Duration::from_millis(500));
     Command::new("kill").args([signal, &child.id().to_string()]).status().unwrap();
     let out = child.wait_with_output().unwrap();
@@ -146,68 +154,71 @@ fn signal_cleanup(signal: &str) {
     assert!(out.status.success(), "{signal}: {so}");
     assert!(so.contains("VIRTUAL_MIC ready source=vibe_phone_mic"), "{so}");
     assert!(summary_field(&so, "frames").parse::<u64>().unwrap() > 20);
-    assert!(!modules_loaded(), "modules must be unloaded after {signal}");
+    wait_mic(pw, false, &format!("mic removed after {signal}"));
 }
 
+/// Runs against a PRIVATE PipeWire instance (never the user's audio daemon).
 #[test]
 fn headless_virtual_mic_lifecycle() {
-    if !vibe_phone_mic::audio::pulse_available() {
-        eprintln!("SKIP: no PulseAudio/PipeWire server");
-        return;
-    }
-    // Tests in this binary run in parallel; the pulse ones share global modules, so run them in sequence.
-    signal_cleanup("-INT");
-    signal_cleanup("-TERM");
+    let Some(pw) = private_pw() else { return };
+    signal_cleanup(pw, "-INT");
+    signal_cleanup(pw, "-TERM");
 
     // Created before connecting: present even if the phone is unreachable, removed on exit.
     let free = common::closed_addr();
-    let (out, so, _) = run(&["--headless", "--connect", &free.to_string()]);
+    let (out, so, _) = run_pw(pw, &["--headless", "--connect", &free.to_string()]);
     assert_eq!(out.status.code(), Some(1));
     assert!(so.contains("VIRTUAL_MIC ready"), "{so}");
-    assert!(!modules_loaded());
+    wait_mic(pw, false, "mic removed");
 
-    // Phone drops the connection: headless exits and unloads.
+    // Phone drops the connection: headless exits and removes the mic.
     let phone = FakePhone::start(FakeConfig { behavior: Behavior::CloseAfter(20), ..Default::default() });
-    let (out, so, _) = run(&["--headless", "--connect", &phone.addr()]);
+    let (out, so, _) = run_pw(pw, &["--headless", "--connect", &phone.addr()]);
     assert!(out.status.success(), "{so}");
-    assert!(!modules_loaded());
+    wait_mic(pw, false, "mic removed");
 
-    two_instances();
+    two_instances(pw);
 }
 
 /// Second instance while the first owns the mic: it streams without a virtual
-/// mic ("in-use") and never touches the first instance's modules.
-fn two_instances() {
+/// mic ("in-use") and never touches the first instance's mic.
+fn two_instances(pw: &PrivatePw) {
     let p1 = FakePhone::start(FakeConfig { freq: 523.0, ..Default::default() });
     let p2 = FakePhone::start(FakeConfig { freq: 880.0, ..Default::default() });
-    let a = Command::new(BIN)
+    let a = pw
+        .cmd(BIN)
         .args(["--headless", "--connect", &p1.addr(), "--duration", "4"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    let t = Instant::now();
-    while !modules_loaded() {
-        assert!(t.elapsed() < Duration::from_secs(5));
-        std::thread::sleep(Duration::from_millis(50));
-    }
+    wait_mic(pw, true, "A's mic");
     std::thread::sleep(Duration::from_millis(300));
-    let (out_b, so_b, se_b) = run(&["--headless", "--connect", &p2.addr(), "--duration", "1"]);
+    let (out_b, so_b, se_b) = run_pw(pw, &["--headless", "--connect", &p2.addr(), "--duration", "1"]);
     assert!(out_b.status.success(), "{so_b}\n{se_b}");
     assert!(so_b.contains("VIRTUAL_MIC error in-use"), "{so_b}");
     assert!(!so_b.contains("VIRTUAL_MIC ready"), "{so_b}");
     assert!(summary_field(&so_b, "frames").parse::<u64>().unwrap() > 50);
-    assert!(modules_loaded(), "second instance removed the first instance's virtual mic");
+    assert_eq!(pw.sources_matching("vibe_phone_mic").len(), 1, "exactly one Vibe Phone Mic");
     // A's mic still carries A's 523 Hz tone.
-    let mut rec = Command::new("parec")
+    let mut rec = pw
+        .cmd("parec")
         .args(["--latency-msec=20", "--device", "vibe_phone_mic", "--format=s16le", "--rate=48000", "--channels=1"])
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
+    // Drain stdout while recording (a full pipe would stall parec).
+    let mut out = rec.stdout.take().unwrap();
+    let reader = std::thread::spawn(move || {
+        let mut v = Vec::new();
+        let _ = std::io::Read::read_to_end(&mut out, &mut v);
+        v
+    });
     std::thread::sleep(Duration::from_millis(1500));
     let _ = rec.kill();
-    let raw = rec.wait_with_output().unwrap().stdout;
+    let _ = rec.wait();
+    let raw = reader.join().unwrap();
     let pcm: Vec<i16> = raw.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect();
     let tail = &pcm[pcm.len().min(9600)..];
     assert!(tail.len() > 4800, "recorded {} samples", pcm.len());
@@ -216,7 +227,7 @@ fn two_instances() {
     let out_a = a.wait_with_output().unwrap();
     assert!(out_a.status.success());
     assert!(String::from_utf8_lossy(&out_a.stdout).contains("VIRTUAL_MIC ready"));
-    assert!(!modules_loaded(), "first instance unloads on exit");
+    wait_mic(pw, false, "first instance removes its mic on exit");
 }
 
 #[test]
