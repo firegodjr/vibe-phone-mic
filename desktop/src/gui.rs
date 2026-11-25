@@ -4,6 +4,7 @@ use crate::audio::MicHost;
 use crate::discovery::{self, ScanConfig, Server};
 use crate::protocol::DEFAULT_PORT;
 use crate::session::{Phase, Session, SessionOptions, SessionState};
+use crate::sfx::{Sfx, Sound};
 use eframe::egui::{
     self, Align, Align2, Color32, CornerRadius, FontFamily, FontId, Layout, Margin, Mesh, Pos2, Rect, RichText, Sense,
     Shape, Stroke, StrokeKind, TextStyle, Theme, Vec2,
@@ -314,6 +315,8 @@ pub struct GuiOptions {
     pub scan_config: Option<ScanConfig>,
     /// "No data" timeout override (tests).
     pub read_timeout: Option<Duration>,
+    /// Play button click sounds (off by default so tests and offscreen renders stay silent).
+    pub sounds: bool,
 }
 
 pub struct VpmApp {
@@ -337,6 +340,7 @@ pub struct VpmApp {
     notice: Option<String>,
     mic: Option<Arc<MicHost>>,
     mic_error: Option<String>,
+    sfx: Sfx,
 }
 
 /// Automatic reconnect after a connection was lost (not user-initiated).
@@ -389,6 +393,7 @@ impl VpmApp {
             notice: None,
             mic: None,
             mic_error: None,
+            sfx: if opts.sounds { Sfx::pulse() } else { Sfx::disabled() },
             opts,
         };
         if app.opts.virtual_mic {
@@ -409,6 +414,11 @@ impl VpmApp {
             app.start_scan(ctx);
         }
         app
+    }
+
+    /// Test hook: replace the click-sound player (e.g. with `Sfx::recorder()`).
+    pub fn set_sfx(&mut self, sfx: Sfx) {
+        self.sfx = sfx;
     }
 
     /// Test hook: set the discovered list.
@@ -680,8 +690,12 @@ impl VpmApp {
                     if self.scanning {
                         ui.add(egui::Spinner::new().size(16.0).color(p.weak));
                         ui.label(RichText::new("Scanning…").color(p.weak));
-                    } else if ui.button("Rescan").clicked() {
-                        self.start_scan(ctx);
+                    } else {
+                        let resp = ui.button("Rescan");
+                        self.sfx.button(ui, &resp, Sound::CarsonMicroflip);
+                        if resp.clicked() {
+                            self.start_scan(ctx);
+                        }
                     }
                 });
             });
@@ -702,6 +716,7 @@ impl VpmApp {
                 let selected = self.selected == Some(i);
                 let w = ui.available_width();
                 let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 52.0), Sense::click());
+                self.sfx.button(ui, &resp, Sound::CarsonMicroflip);
                 let fill = if selected {
                     p.bg
                 } else if resp.hovered() {
@@ -782,12 +797,16 @@ impl VpmApp {
             }
             ui.add_space(4.0);
             if active {
-                if secondary_button(ui, p, "Disconnect").clicked() {
+                let resp = secondary_button(ui, p, "Disconnect");
+                self.sfx.button(ui, &resp, Sound::KvmSwitch);
+                if resp.clicked() {
                     self.disconnect();
                 }
             } else {
                 let can = !self.host.trim().is_empty();
-                if gradient_button(ui, "Connect", can).clicked() {
+                let resp = gradient_button(ui, "Connect", can);
+                self.sfx.button(ui, &resp, Sound::KvmSwitch);
+                if resp.clicked() {
                     self.connect(ctx);
                 }
             }

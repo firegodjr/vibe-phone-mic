@@ -10,3 +10,4 @@ pub mod pwmic;
 pub mod render;
 pub mod resample;
 pub mod session;
+pub mod sfx;

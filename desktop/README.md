@@ -7,6 +7,7 @@ virtual microphone called **Vibe Phone Mic** in PulseAudio/PipeWire.
 
 ```sh
 ./VibePhoneMic-x86_64.AppImage            # GUI: pick a phone (or type its IP), press Connect
+./VibePhoneMic-x86_64.AppImage --no-sounds   # same, without button click sounds
 ```
 
 Then select **Vibe Phone Mic** as the microphone in your apps. Mute and volume are controlled on the phone; the
@@ -67,7 +68,7 @@ VPM_LONG_TESTS=1 cargo test --test pw_virtual_mic two_minutes   # 2-minute drift
 python3 tools/fake_phone.py --freq 440    # fake phone (UDP discovery + TCP stream) for manual testing
 ```
 
-Build needs `libpipewire-0.3` and `libpulse` development files and a C compiler (a small C shim, `src/pw_shim.c`,
+Build needs `libpipewire-0.3` and `libpulse` (incl. `libpulse-simple`) development files and a C compiler (a small C shim, `src/pw_shim.c`,
 wraps `pw_stream`; the AppImage links the system `libpipewire-0.3.so.0`).
 
 `fake_phone.py` options: `--port`, `--freq`, `--rate`, `--channels`, `--name`, `--amplitude`, `--volume`,
@@ -85,4 +86,4 @@ PNGs to `target/tmp/gui-snapshots/`.
 
 Layout: `src/protocol.rs` codec · `discovery.rs` UDP broadcast + localhost probe + /24 sweep · `client.rs` receiver
 thread · `audio.rs` virtual mic host (PipeWire / PulseAudio fallback), WAV · `pwmic.rs` + `pw_shim.c` native PipeWire source + jitter buffer · `resample.rs` downmix/resample · `session.rs` client + outputs + state ·
-`gui.rs` egui UI · `render.rs` offscreen rasterizer · `main.rs` CLI.
+`gui.rs` egui UI · `sfx.rs` button click sounds (embedded `assets/sfx`, played via libpulse-simple; see `../sounds/`) · `render.rs` offscreen rasterizer · `main.rs` CLI.

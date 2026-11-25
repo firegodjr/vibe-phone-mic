@@ -1,5 +1,6 @@
 package com.vibephonemic.ui
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,7 +56,11 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, modifier = Modifier.testTag("back_button")) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.testTag("back_button"),
+                    interactionSource = rememberSoundInteraction(ButtonSound.CarsonMicroflip),
+                ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
                 Spacer(Modifier.width(4.dp))
@@ -105,7 +110,13 @@ private fun InputRow(label: String, selected: Boolean, tag: String, onClick: () 
     Row(
         Modifier
             .fillMaxWidth()
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .selectable(
+                selected = selected,
+                interactionSource = rememberSoundInteraction(ButtonSound.CarsonMicroflip),
+                indication = LocalIndication.current,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
             .testTag(tag)
             .padding(horizontal = 10.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,

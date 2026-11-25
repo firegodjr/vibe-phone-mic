@@ -23,14 +23,15 @@ Requirements on Linux: PipeWire (libpipewire-0.3 ≥ 0.3.49; the mic is a native
 
 - `android/` — Kotlin + Jetpack Compose app (server). See `android/README.md`.
 - `desktop/` — Rust + egui app (client, virtual mic). See `desktop/README.md`.
+- `sounds/` — button click sounds (vendored from joshwcomeau/button-sounds, MIT) and the script that cuts them.
 - `e2e/` — end-to-end harness: real APK in a headless emulator whose mic is fed a 440 Hz tone, streaming to the real AppImage.
 - `PLAN.md` — design, wire protocol, decisions and status.
 
 ## Tests
 
 ```sh
-cd desktop && CARGO_HOME=../.cache/cargo cargo test          # 103 tests; audio tests use a private PipeWire instance
-cd android && ./gradlew testDebugUnitTest                    # 110 tests (see android/README.md for env vars)
+cd desktop && CARGO_HOME=../.cache/cargo cargo test          # 110 tests; audio tests use a private PipeWire instance
+cd android && ./gradlew testDebugUnitTest                    # 121 tests (see android/README.md for env vars)
 e2e/run_e2e.sh [--no-build] [--keep-emulator]                # full end-to-end, 30 checks
 ```
 

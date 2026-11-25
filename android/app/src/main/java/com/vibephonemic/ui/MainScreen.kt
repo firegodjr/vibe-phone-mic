@@ -102,7 +102,11 @@ private fun Header(onOpenSettings: () -> Unit) {
         Logo()
         Spacer(Modifier.width(12.dp))
         Text("Vibe Phone Mic", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-        IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("settings_button")) {
+        IconButton(
+            onClick = onOpenSettings,
+            modifier = Modifier.testTag("settings_button"),
+            interactionSource = rememberSoundInteraction(ButtonSound.CarsonMicroflip),
+        ) {
             Icon(Icons.Filled.Settings, contentDescription = "Settings")
         }
     }
@@ -128,7 +132,11 @@ private fun PermissionCard(onGrant: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Button(onClick = onGrant, modifier = Modifier.testTag("grant_permission")) { Text("Grant access") }
+        Button(
+            onClick = onGrant,
+            modifier = Modifier.testTag("grant_permission"),
+            interactionSource = rememberSoundInteraction(ButtonSound.KvmSwitch),
+        ) { Text("Grant access") }
     }
 }
 
@@ -207,6 +215,7 @@ private fun StatusCard(server: ServerState, permissionGranted: Boolean, onStartS
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                 modifier = Modifier.height(34.dp).testTag("server_toggle"),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                interactionSource = rememberSoundInteraction(ButtonSound.KvmSwitch),
             ) {
                 Text(if (server.running) "Stop" else "Start", style = MaterialTheme.typography.labelLarge)
             }
@@ -249,6 +258,7 @@ private fun MicControls(state: MainUiState, level: Float, onToggleMute: () -> Un
                 onClick = { onVolumeChange(AudioMath.clampVolume(state.volume - 10)) },
                 modifier = Modifier.testTag("volume_down").semantics { contentDescription = "Volume down" },
                 colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurface),
+                interactionSource = rememberSoundInteraction(ButtonSound.CarsonMicroflip),
             ) { Text("−", fontSize = 22.sp) }
             VolumeSlider(
                 volume = state.volume,
@@ -259,6 +269,7 @@ private fun MicControls(state: MainUiState, level: Float, onToggleMute: () -> Un
                 onClick = { onVolumeChange(AudioMath.clampVolume(state.volume + 10)) },
                 modifier = Modifier.testTag("volume_up").semantics { contentDescription = "Volume up" },
                 colors = ButtonDefaults.textButtonColors(contentColor = colors.onSurface),
+                interactionSource = rememberSoundInteraction(ButtonSound.CarsonMicroflip),
             ) { Text("+", fontSize = 22.sp) }
             Text(
                 AudioMath.percentLabel(state.volume),

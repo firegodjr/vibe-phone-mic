@@ -108,12 +108,13 @@ class MicServerTest {
 
     private fun startServer(
         source: AudioSource = SineAudioSource(440.0, 48000),
+        gate: SilenceGate? = null,
         watchdog: () -> CaptureWatchdog = { CaptureWatchdog() },
     ) {
         val l = object : MicServer.Listener by listener {
             override fun onWarning(message: String) { warnings.add(message) }
         }
-        server = MicServer(port = 0, deviceName = "Test Phone", initialSource = source, listener = l, watchdogFactory = watchdog)
+        server = MicServer(port = 0, deviceName = "Test Phone", initialSource = source, listener = l, watchdogFactory = watchdog, silenceGate = gate)
         server.start()
         assertTrue(server.localPort > 0)
     }
@@ -213,6 +214,34 @@ class MicServerTest {
             val rms = AudioMath.rms(a.samples, a.samples.size)
             // sine amplitude 0.5 * 32767 at 50% gain -> rms ~ 5790
             assertTrue("rms $rms", rms in 5000.0..6600.0)
+        }
+    }
+
+    @Test fun closedSilenceGateStreamsZerosWithoutReportingMute() {
+        val gate = SilenceGate()
+        startServer(gate = gate)
+        TestClient(server.localPort, ClientMode.STREAM).use { c ->
+            assertEquals(false, c.expectHelloAndStatus()["muted"])
+            val live = FrameCodec.decodeAudio(c.nextOfType(Protocol.TYPE_AUDIO).payload)
+            assertTrue(AudioMath.rms(live.samples, live.samples.size) > 1000)
+            gate.hold(400)
+            // A few frames may already be queued from before hold(); then a run of silence ≈ 400 ms, then audio again.
+            repeat(3) { c.nextOfType(Protocol.TYPE_AUDIO) }
+            var silent = 0
+            var resumed = false
+            for (i in 0 until 150) {
+                val f = c.next()
+                assertEquals("no STATUS: mute state is unchanged", Protocol.TYPE_AUDIO, f.type)
+                val a = FrameCodec.decodeAudio(f.payload)
+                if (AudioMath.rms(a.samples, a.samples.size) == 0.0) {
+                    silent++
+                } else if (silent > 0) {
+                    resumed = true
+                    break
+                }
+            }
+            assertTrue("audio resumed after the gate opened", resumed)
+            assertTrue("silent frames: $silent", silent in 30..50)
         }
     }
 

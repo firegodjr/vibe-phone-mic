@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import com.vibephonemic.core.SilenceGate
 
 /** Persisted user settings. [inputDeviceId] 0 = system default microphone. */
 data class UserSettings(
@@ -33,6 +34,9 @@ object AppState {
 
     val server = MutableStateFlow(ServerState())
     val level = MutableStateFlow(0f)
+
+    /** Closed by [com.vibephonemic.ui.ButtonSounds] around every click so clicks are never streamed. */
+    val soundGate = SilenceGate()
 
     /** Debug-only: frequency of the generated test tone that replaces the microphone, or null. */
     @Volatile var testToneHz: Int? = null

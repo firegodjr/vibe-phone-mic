@@ -1,6 +1,7 @@
 package com.vibephonemic.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,7 +52,13 @@ fun MuteButton(muted: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifi
             .size(120.dp)
             .clip(CircleShape)
             .then(bg)
-            .toggleable(value = muted, role = Role.Switch, onValueChange = { onToggle() })
+            .toggleable(
+                value = muted,
+                interactionSource = rememberSoundInteraction(ButtonSound.HaloSpace),
+                indication = LocalIndication.current,
+                role = Role.Switch,
+                onValueChange = { onToggle() },
+            )
             .semantics {
                 contentDescription = "Mute microphone"
                 stateDescription = if (muted) "Muted" else "Live"

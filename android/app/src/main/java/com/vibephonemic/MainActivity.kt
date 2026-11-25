@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +32,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
+import com.vibephonemic.ui.ButtonSounds
+import com.vibephonemic.ui.LocalSoundPlayer
 import com.vibephonemic.ui.MainScreen
 import com.vibephonemic.ui.MainUiState
 import com.vibephonemic.ui.SettingsScreen
@@ -40,6 +43,7 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     private var permissionGranted by mutableStateOf(false)
     private var addresses by mutableStateOf(emptyList<LocalAddress>())
+    private var sounds: ButtonSounds? = null
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -69,6 +73,7 @@ class MainActivity : ComponentActivity() {
         refreshPermission()
         if (!permissionGranted && savedInstanceState == null) requestPermissions()
         addresses = NetworkAddresses.list()
+        val player = ButtonSounds(this, AppState.soundGate) { AppState.settings.value.muted }.also { sounds = it }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
@@ -79,13 +84,21 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             VpmTheme {
-                VpmApp(
-                    permissionGranted = permissionGranted,
-                    addresses = addresses,
-                    onGrantPermission = ::requestPermissions,
-                )
+                CompositionLocalProvider(LocalSoundPlayer provides player) {
+                    VpmApp(
+                        permissionGranted = permissionGranted,
+                        addresses = addresses,
+                        onGrantPermission = ::requestPermissions,
+                    )
+                }
             }
         }
+    }
+
+    override fun onDestroy() {
+        sounds?.release()
+        sounds = null
+        super.onDestroy()
     }
 
     override fun onStart() {

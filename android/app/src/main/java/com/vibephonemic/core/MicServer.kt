@@ -24,6 +24,8 @@ class MicServer(
     private val listener: Listener = object : Listener {},
     private val fallbackSource: (sampleRate: Int) -> AudioSource = { SilenceAudioSource(it) },
     private val watchdogFactory: () -> CaptureWatchdog = { CaptureWatchdog() },
+    /** While closed, frames are zeroed (the app's own UI sounds are playing). Doesn't change the reported mute. */
+    private val silenceGate: SilenceGate? = null,
 ) {
     interface Listener {
         /** Called with the client's IP when a stream client connects, or null when it disconnects. */
@@ -181,7 +183,7 @@ class MicServer(
                         listener.onWarning("Microphone still delivers digital silence after reopening; giving up")
                     CaptureWatchdog.Action.OK -> {}
                 }
-                AudioMath.applyGain(buf, n, volume, muted)
+                AudioMath.applyGain(buf, n, volume, muted || silenceGate?.isClosed == true)
                 levelPeak = maxOf(levelPeak, AudioMath.meterLevel(buf, n))
                 if (++levelFrames >= 3) {
                     listener.onLevel(levelPeak)

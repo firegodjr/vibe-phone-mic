@@ -49,6 +49,9 @@ struct Cli {
     /// GUI theme: system, light or dark.
     #[arg(long, default_value = "system")]
     theme: String,
+    /// GUI: no button click sounds.
+    #[arg(long)]
+    no_sounds: bool,
     /// GUI: don't scan on startup.
     #[arg(long, hide = true)]
     no_scan: bool,
@@ -94,6 +97,7 @@ fn main() {
         }
         return;
     }
+    let opts = gui::GuiOptions { sounds: !cli.no_sounds, ..opts };
     if let Err(e) = gui::run(opts, theme) {
         eprintln!("error: {e}");
         std::process::exit(1);

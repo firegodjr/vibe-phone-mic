@@ -169,7 +169,7 @@ class MicService : Service() {
             }
         }
         val port = portOverride ?: Protocol.PORT
-        val srv = MicServer(port, deviceName(), buildSource(settings), listener)
+        val srv = MicServer(port, deviceName(), buildSource(settings), listener, silenceGate = AppState.soundGate)
         srv.setMuted(settings.muted)
         srv.setVolume(settings.volume)
         val disc = DiscoveryResponder(port, Protocol.PORT) { srv.deviceName }
