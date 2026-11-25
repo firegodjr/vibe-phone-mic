@@ -3,6 +3,9 @@ package com.vibephonemic.ui
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.Composable
@@ -60,11 +63,14 @@ interface SoundPlayer {
 /**
  * SoundPool-backed player. Create once per Activity and [release] it in onDestroy.
  *
+ * A release sound starts at least [MIN_PRESS_RELEASE_GAP_MS] after its press sound, so a quick tap still sounds
+ * like a substantial two-part switch. If the finger lifts sooner, the up sample is delayed.
+ *
  * Nothing it plays is ever streamed:
- * - A [ButtonSound.gated] sound (the mute toggle) first closes [gate] for [GATE_HOLD_MS], so the stream is silent
- *   from just before the click until it has died away (clip ≤ ~100 ms + speaker output latency + capture latency
- *   + room tail). The stream goes silent on press, and on unmute it stays silent until the release click has
- *   played. The UI still updates immediately.
+ * - A [ButtonSound.gated] sound (the mute toggle) closes [gate] at once, for any release delay plus
+ *   [GATE_HOLD_MS]. The stream is silent from just before the click until it has played. The stream goes silent on
+ *   press, and on unmute it stays silent until the (possibly delayed) release click has played. The UI still
+ *   updates immediately.
  * - Every other sound plays only while [isMuted], and is skipped while the mic is live.
  */
 class ButtonSounds(
@@ -73,11 +79,19 @@ class ButtonSounds(
     private val isMuted: () -> Boolean = { false },
 ) : SoundPlayer {
     companion object {
-        const val GATE_HOLD_MS = 500L
+        const val GATE_HOLD_MS = 200L
+        const val MIN_PRESS_RELEASE_GAP_MS = 50L
+
+        /** How long to delay a release sound requested at [nowMs] whose press sound started at [pressAtMs]. */
+        fun releaseDelayMs(pressAtMs: Long?, nowMs: Long): Long =
+            if (pressAtMs == null) 0L else (MIN_PRESS_RELEASE_GAP_MS - (nowMs - pressAtMs)).coerceAtLeast(0L)
 
         /** Whether [sound] may play right now given the mic's mute state. */
         fun shouldPlay(sound: ButtonSound, muted: Boolean): Boolean = sound.gated || muted
     }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val lastPressAt = HashMap<ButtonSound, Long>()
 
     private val pool = SoundPool.Builder()
         .setMaxStreams(6)
@@ -103,12 +117,21 @@ class ButtonSounds(
 
     override fun play(sound: ButtonSound, press: Boolean) {
         if (!shouldPlay(sound, isMuted())) return
+        val now = SystemClock.uptimeMillis()
+        val delay = if (press) 0L else releaseDelayMs(lastPressAt.remove(sound), now)
+        if (press) lastPressAt[sound] = now
+        // Close the gate now (not when the delayed clip starts): on unmute the stream must stay silent throughout.
+        if (sound.gated) gate?.hold(delay + GATE_HOLD_MS)
         val bank = banks.getValue(sound to press)
-        if (sound.gated) gate?.hold(GATE_HOLD_MS)
-        pool.play(bank.ids[bank.picker.next()], sound.volume, sound.volume, 1, 0, 1f)
+        val id = bank.ids[bank.picker.next()]
+        val start = Runnable { pool.play(id, sound.volume, sound.volume, 1, 0, 1f) }
+        if (delay == 0L) start.run() else handler.postDelayed(start, delay)
     }
 
-    fun release() = pool.release()
+    fun release() {
+        handler.removeCallbacksAndMessages(null)
+        pool.release()
+    }
 }
 
 val LocalSoundPlayer = staticCompositionLocalOf<SoundPlayer> { SoundPlayer.None }

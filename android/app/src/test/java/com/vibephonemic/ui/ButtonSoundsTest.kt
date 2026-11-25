@@ -108,6 +108,28 @@ class ButtonSoundsTest {
         sounds.release()
     }
 
+    @Test fun releaseSoundKeepsMinimumGapAfterPress() {
+        assertEquals(0L, ButtonSounds.releaseDelayMs(null, 1000))
+        assertEquals(50L, ButtonSounds.releaseDelayMs(1000, 1000))
+        assertEquals(30L, ButtonSounds.releaseDelayMs(1000, 1020))
+        assertEquals(0L, ButtonSounds.releaseDelayMs(1000, 1050))
+        assertEquals(0L, ButtonSounds.releaseDelayMs(1000, 1400))
+    }
+
+    @Test fun quickMuteTapKeepsGateClosedThroughDelayedReleaseClick() {
+        var nowNs = 0L
+        val gate = SilenceGate { nowNs }
+        val sounds = ButtonSounds(ApplicationProvider.getApplicationContext(), gate)
+        // Robolectric's clock is paused, so the release comes 0 ms after the press and is delayed by the full 50 ms.
+        sounds.play(ButtonSound.HaloSpace, press = true)
+        sounds.play(ButtonSound.HaloSpace, press = false)
+        nowNs = (ButtonSounds.GATE_HOLD_MS + ButtonSounds.MIN_PRESS_RELEASE_GAP_MS - 1) * 1_000_000
+        assertTrue("gate must cover the delayed release click", gate.isClosed)
+        nowNs += 1_000_000
+        assertFalse(gate.isClosed)
+        sounds.release()
+    }
+
     @Test fun soundPoolPlayerLoadsAllClipsAndPlays() {
         val sounds = ButtonSounds(ApplicationProvider.getApplicationContext(), isMuted = { true })
         for (s in ButtonSound.entries) {

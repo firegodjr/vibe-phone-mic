@@ -12,9 +12,10 @@ is not a submodule.
 
 Each upstream sound is a single sprite file that holds 4–8 recordings. `extract.py` cuts it into one file per
 recording: `down<n>` is the press and `up<n>` is the release. The apps play a random down sample when the finger or
-pointer goes down, and a random up sample on release. They never play the same sample twice in a row.
+pointer goes down, and a random up sample on release. They never play the same sample twice in a row. A release sound starts at least 50 ms after its press
+sound, even on a quick tap, so the switch feels substantial.
 
-The Android app never streams its own clicks. The mute button's clip first closes a 500 ms silence gate on the
+The Android app never streams its own clicks. The mute button's clip first closes a 200 ms silence gate on the
 outgoing mic stream (`core/SilenceGate.kt`). All other Android buttons click only while the mic is muted.
 
 Outputs (committed):

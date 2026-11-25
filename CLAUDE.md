@@ -23,12 +23,16 @@ The choices below are specific to this app.
 
 - **The phone's mic is live, so clicks must never be streamed** (a user requirement):
   - The mute toggle (`ButtonSound.gated = true`) always plays. Before its clip, `ButtonSounds` closes
-    `AppState.soundGate` (`core/SilenceGate.kt`) for `GATE_HOLD_MS` = 500 ms. While the gate is closed,
+    `AppState.soundGate` (`core/SilenceGate.kt`) for `GATE_HOLD_MS` = 200 ms, plus any release delay. While the gate is closed,
     `MicServer` sends zero frames.
   - The gate doesn't change the reported mute or the UI. Muting goes silent on press. Unmuting shows "live" at
     once but stays silent until the release click has played. The button color must change immediately.
   - Every other Android sound plays only while the user's mute setting is on (`ButtonSounds.shouldPlay`). Don't
     gate them: that would punch holes in live audio.
+- **Minimum 50 ms between press and release sounds** (user preference: it makes the button feel substantial).
+  If the release comes sooner, its sound is delayed: `ButtonSounds.MIN_PRESS_RELEASE_GAP_MS` on Android and
+  `sfx::MIN_PRESS_RELEASE_GAP` on desktop. On Android the mute button's gate is closed at release time, for the
+  delay plus 200 ms, so a quick unmute can't leak the delayed click.
 - **Android wiring:** `ui/ButtonSounds.kt` holds the `ButtonSound` enum, the `SoundPool` player,
   `LocalSoundPlayer` and `rememberSoundInteraction(sound)`. Pass the last one as a component's
   `interactionSource`. `MainActivity` creates the player with the gate and a mute lambda, and releases it in

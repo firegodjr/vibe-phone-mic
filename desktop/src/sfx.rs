@@ -11,7 +11,7 @@
 use eframe::egui;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// (down samples, up samples), each interleaved stereo 48 kHz s16.
 pub type Clips = (Vec<Vec<i16>>, Vec<Vec<i16>>);
@@ -192,6 +192,14 @@ impl Sfx {
 
 /// How long the playback stream stays open after the last click.
 const IDLE_CLOSE: Duration = Duration::from_secs(4);
+/// A release sound starts at least this long after its press sound (a quick click still sounds like a
+/// substantial two-part switch; keyboard activation plays press then release this far apart).
+pub const MIN_PRESS_RELEASE_GAP: Duration = Duration::from_millis(50);
+
+/// How long to wait before a release sound requested at `now` whose press sound started at `press_at`.
+pub fn release_delay(press_at: Option<Instant>, now: Instant) -> Duration {
+    press_at.map_or(Duration::ZERO, |p| (p + MIN_PRESS_RELEASE_GAP).saturating_duration_since(now))
+}
 
 fn open_stream() -> Result<libpulse_simple_binding::Simple, String> {
     use libpulse_binding::def::BufferAttr;
@@ -220,7 +228,13 @@ fn player_thread(rx: Receiver<(Sound, bool, usize)>) {
             }
         };
         let mut next = Some(first);
+        let mut press_at: [Option<Instant>; Sound::ALL.len()] = [None; Sound::ALL.len()];
         while let Some((sound, press, i)) = next {
+            if press {
+                press_at[sound.index()] = Some(Instant::now());
+            } else {
+                std::thread::sleep(release_delay(press_at[sound.index()].take(), Instant::now()));
+            }
             let (downs, ups) = sound.clips();
             let clip = if press { &downs[i] } else { &ups[i] };
             let g = sound.gain();
@@ -254,6 +268,16 @@ mod tests {
             prev = i;
         }
         assert!(seen.iter().all(|&s| s));
+    }
+
+    #[test]
+    fn release_waits_for_minimum_gap_after_press() {
+        let t = Instant::now();
+        assert_eq!(release_delay(None, t), Duration::ZERO);
+        assert_eq!(release_delay(Some(t), t), MIN_PRESS_RELEASE_GAP);
+        assert_eq!(release_delay(Some(t), t + Duration::from_millis(20)), Duration::from_millis(30));
+        assert_eq!(release_delay(Some(t), t + Duration::from_millis(50)), Duration::ZERO);
+        assert_eq!(release_delay(Some(t), t + Duration::from_millis(400)), Duration::ZERO);
     }
 
     #[test]

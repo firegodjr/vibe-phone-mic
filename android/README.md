@@ -37,8 +37,8 @@ Unit tests point the test JVM's `user.home` at `android/.gradle/test-home`. This
 3. **USB:** run `adb forward tcp:48777 tcp:48777` on the computer, then connect to `127.0.0.1`.
 4. In **Settings** (the gear icon), you can choose which microphone input to use. The choice is saved.
 
-Buttons click. A press plays a random "down" sample and the release plays a random "up" sample (see `../sounds/`). The sounds play on the sonification stream, so the system volume controls them. The clicks are never streamed:
-- **Mute button:** before its clip plays, `ButtonSounds` closes `AppState.soundGate` (`core/SilenceGate.kt`) for 500 ms, and while the gate is closed `MicServer` sends zero frames. The reported mute state doesn't change and the UI updates immediately. Pressing Mute silences the stream at once, and unmuting keeps it silent until the release click has played.
+Buttons click. A press plays a random "down" sample and the release plays a random "up" sample (see `../sounds/`). The up sample starts at least 50 ms after the down sample. The sounds play on the sonification stream, so the system volume controls them. The clicks are never streamed:
+- **Mute button:** before its clip plays, `ButtonSounds` closes `AppState.soundGate` (`core/SilenceGate.kt`) for 200 ms (plus any release delay), and while the gate is closed `MicServer` sends zero frames. The reported mute state doesn't change and the UI updates immediately. Pressing Mute silences the stream at once, and unmuting keeps it silent until the release click has played.
 - **All other buttons:** they click only while the mic is muted. While it's live they make no sound.
 
 ## Code layout

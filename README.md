@@ -30,8 +30,8 @@ Requirements on Linux: PipeWire (libpipewire-0.3 ≥ 0.3.49; the mic is a native
 ## Tests
 
 ```sh
-cd desktop && CARGO_HOME=../.cache/cargo cargo test          # 110 tests; audio tests use a private PipeWire instance
-cd android && ./gradlew testDebugUnitTest                    # 121 tests (see android/README.md for env vars)
+cd desktop && CARGO_HOME=../.cache/cargo cargo test          # 111 tests; audio tests use a private PipeWire instance
+cd android && ./gradlew testDebugUnitTest                    # 123 tests (see android/README.md for env vars)
 e2e/run_e2e.sh [--no-build] [--keep-emulator]                # full end-to-end, 30 checks
 ```
 
